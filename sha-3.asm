@@ -1,12 +1,11 @@
 SECTION .data
  
-       message1: db "Enter the first number: ", 0
-        message2: db "Enter the second number: ", 0
-        formatin: db "%d", 0
-        formatout: db "%d", 10, 0 ; newline, nul terminator
-
-        integer1: times 4 db 0
-        integer2: times 4 db 0    ; 32-bits integer = 4 bytes
+        message1: db "Enter file name: ", 0
+        formatins: db "%s", 0
+        formatouts: db "%s", 10, 0
+        
+SECTION .bss
+        file_name: resb 200
 
 SECTION .text
 
@@ -23,26 +22,13 @@ SECTION .text
         call printf
         add esp, 4      ;remove parameters
 
-        push integer1   ;address of integer1 (second parameter)
-        push formatin   ; args are right to left (first parameter)
+        push file_name   ;address of integer1 (second parameter)
+        push formatins   ; args are right to left (first parameter)
         call scanf
         add esp, 8      ; remove parameters
 
-        push message2
-        call printf
-        add esp, 4      ; remove parameters
-
-        push integer2   ; address of integer2
-        push formatin   ; arguments are right ot left
-        call scanf
-        add esp, 8      ; remove parameters
-
-        mov ebx, dword [integer1]
-        mov ecx, dword [integer2]
-        add ebx, ecx    ; add the values
-
-        push ebx
-        push formatout
+        push file_name
+        push formatouts
         call printf     ; display the sum
         add esp, 8      ; remove parameters
 
