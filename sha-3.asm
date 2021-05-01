@@ -1,54 +1,53 @@
-%define STDIN 0x0
-%define STDOUT 0x1
-%define SYSCALL int 0x80
-%define SYSEXIT 0x1
-%define SYSWRITE 0x4
-%define SYSREAD 0x3
-%define SYSOPEN 0x5
-%define READONLY 0x0
+SECTION .data
+ 
+       message1: db "Enter the first number: ", 0
+        message2: db "Enter the second number: ", 0
+        formatin: db "%d", 0
+        formatout: db "%d", 10, 0 ; newline, nul terminator
 
-global _start
+        integer1: times 4 db 0
+        integer2: times 4 db 0    ; 32-bits integer = 4 bytes
 
-section .text:
+SECTION .text
 
-_start:
-            ;putting stuff in the registers
-    mov ecx, message                    ;message is the buffer
-    mov edx, message_length             ;message length is the number of bytes needed
-    call print
+        global main
 
-    mov ecx, buffer
-    mov edx, buffer_size
-    call read
+        extern scanf
+        extern printf
 
-    call rot
+     main:
+        push ebx        ;save registers
+        push ecx
 
-    call print
+        push message1
+        call printf
+        add esp, 4      ;remove parameters
 
-    call end
+        push integer1   ;address of integer1 (second parameter)
+        push formatin   ; args are right to left (first parameter)
+        call scanf
+        add esp, 8      ; remove parameters
 
-print:
-    mov eax, SYSWRITE                        ;use the write syscall
-    mov ebx, STDOUT                          ;1 is stdout (desination)
-    SYSCALL
-    ret
+        push message2
+        call printf
+        add esp, 4      ; remove parameters
 
-read:
-    mov eax, SYSREAD
-    mov ebx, STDIN
-    SYSCALL
-    ret
+        push integer2   ; address of integer2
+        push formatin   ; arguments are right ot left
+        call scanf
+        add esp, 8      ; remove parameters
 
-end:
-    mov eax, SYSEXIT
-    mov ebx, 0x0
-    SYSCALL
-    ret
+        mov ebx, dword [integer1]
+        mov ecx, dword [integer2]
+        add ebx, ecx    ; add the values
 
-section .data:
+        push ebx
+        push formatout
+        call printf     ; display the sum
+        add esp, 8      ; remove parameters
 
-    message: db "Input sentence: "    ;define bytes
-    message_length equ $-message        ;equal to
-section .bss
-    buffer resb 100
-    buffer_size equ $-buffer
+        pop ecx
+        pop ebx         ; restore registers in reverse order
+        mov eax, 0      
+
+     ret
