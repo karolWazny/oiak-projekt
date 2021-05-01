@@ -12,10 +12,10 @@ SECTION .data
         
         fname_w_prefix: db "./"
         file_name: times 200 db 0
-        file_buffer: times 1024 db 0
         
 SECTION .bss
         descriptor: resb 4
+        file_buffer: resb 1024
         
 
 SECTION .text
