@@ -261,3 +261,39 @@ SECTION .text
         add esp, 4
 
         ret
+
+    ; arguments:
+    ; first lane address        [esp + 4]
+    ; second lane address       [esp + 8]
+    ; third lane address        [esp + 12]
+    ; destination address       [esp + 16]
+    ; lane length in bytes      [esp + 20]
+    chi_partial:
+        mov ecx, 0          ; byte counter
+        chi_partial_loop:
+            mov eax, [esp + 8]
+            mov al, [eax + ecx]
+
+            ; not second lane
+            mov bl, 0xFF
+            xor al, bl
+
+            ; and third lane
+            mov ebx, [esp + 12]
+            mov bl, [ebx + ecx]
+            and al, bl
+
+            ; xor first lane
+            mov ebx, [esp + 4]
+            mov bl, [ebx + ecx]
+            xor al, bl
+
+            ; write output to destination string
+            mov ebx, [esp + 16]
+            mov [ebx + ecx], al
+
+            inc ecx
+
+            cmp ecx, [esp + 20]
+            jb chi_partial_loop
+        ret
