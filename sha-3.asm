@@ -599,3 +599,43 @@ SECTION .text
 
             compare_end:
             ret
+
+
+        ; arguments:
+        ; eax - adres referencyjny
+        ; ebx - offset (w BITACH!)
+        ; ecx - wartosc bitu
+        write_bit:
+            push ebx
+
+            shr ebx, 3
+            add eax, ebx
+
+            pop ebx
+            and ebx, 0x7
+
+            push ecx
+
+            mov ecx, ebx
+            mov edx, 1
+            shl edx, cl
+
+            pop ecx
+
+            cmp ecx, 0
+            jne write_one
+
+            write_zero:
+                mov cl, [eax]
+                not dl
+                and cl, dl
+                mov [eax], cl
+                jmp write_bit_end
+
+            write_one:
+                mov cl, [eax]
+                or cl, dl
+                mov [eax], cl
+
+            write_bit_end:
+            ret
