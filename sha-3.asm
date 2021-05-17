@@ -4,26 +4,25 @@
 %define FCLOSE 0x06
 %define READ_ONLY 0x0
 
-%define LSEEK 0x13
-%define SEEK_SET 0
-%define SEEK_CUR 1
-%define SEEK_END 2
-
 SECTION .data
  
-        message1: db "Enter file name: ", 0
+        message1: db "Enter first operand in hex: 0x", 0
+        message2: db "Enter second operand in hex: 0x", 0
+        message3: db "Multiplication result: ", 10,"0x", 0
+        message_err: db "Wrong operand!", 10, 0
+        message_crit: db "Problem occured. Ending program...", 10, 0
+
         formatins: db "%s", 0
+        formatout_hhx_pad: db "%02hhX", 0
+        formatout_hhx: db "%hhX", 0
         formatouts: db "%s", 10, 0
-        
-        fname_w_prefix: db "./"
-        file_name: times 200 db 0
+
+        operand_1_num: times 100 db 0
+        operand_2_num: times 100 db 0
+        output_num: times 200 db 0
         
 SECTION .bss
-        descriptor: resb 4
-        file_size: resb 4
-        file_buffer: resb 1024
-        lane_pointers: resb 25
-        lane_pointers_alt: resb 25
+        input_buffer: resb 256
         
 
 SECTION .text
@@ -32,268 +31,468 @@ SECTION .text
 
         extern scanf
         extern printf
-        extern ftell
-        extern malloc
-        extern free
+        extern memset
+        extern putchar
 
      main:
         push ebx        ;save registers
         push ecx
 
+        first_operand:
+
         push message1
         call printf
         add esp, 4      ;remove parameters
 
-        push file_name   ;address of integer1 (second parameter)
-        push formatins   ; args are right to left (first parameter)
+        push input_buffer       ;address of integer1 (second parameter)
+        push formatins          ; args are right to left (first parameter)
         call scanf
-        add esp, 8      ; remove parameters
-        
-        push fname_w_prefix
-        call open_file
-        pop DWORD [descriptor]
-        
-        push DWORD 1024
-        push file_buffer
-        push DWORD [descriptor]
-        call read_file
+        add esp, 8              ; remove parameters
+
+        mov eax, input_buffer
+        call str_len            ; how long was the string provided?
+        cmp eax, 0              ; if no digits were provided, we ask for them
+        je first_operand_not_ok ; again
+
+        cmp eax, 255            ; if length of string provided exceeded buffer      
+        ja critical             ; we might have overwritten sth important
+                                ; so we just end the program
+
+        cmp eax, 200            ; if we exceeded length of number
+        je first_operand_not_ok ; but not the buffer, we can deal with it
+
+        mov ebx, input_buffer
+        add eax, ebx
+        dec eax
+        push ebx                ; last argument - byte 0 of source string
+        push eax                ; second argument - last byte of source address
+        push operand_1_num      ; first argument - destination for enourmous int
+        call parse
         add esp, 12
-        
-        push DWORD [descriptor]
-        call close_file
+
+        cmp al, 0xFF            ; we catch any errors occured while parsing
+        je first_operand_not_ok
+
+        jmp second_operand
+
+        first_operand_not_ok:
+        push message_err
+        call printf
         add esp, 4
 
-        push file_buffer
-        push formatouts
-        call printf     ; display the sum
-        add esp, 8      ; remove parameters
+        push DWORD 100          ; problem might have occured during string parsing
+        push DWORD 0x0          ; leaving rubbish in operand_1_num
+        push operand_1_num      ; we get rid of that to be able to
+        call memset             ; use that space for parsing again
+        add esp, 12
 
+        jmp first_operand
+
+
+        second_operand:
+
+        push message2
+        call printf
+        add esp, 4      ;remove parameters
+
+        push input_buffer       ;address of integer1 (second parameter)
+        push formatins          ; args are right to left (first parameter)
+        call scanf
+        add esp, 8              ; remove parameters
+
+        mov eax, input_buffer
+        call str_len                ; how long was the string provided?
+        cmp eax, 0                  ; if no digits were provided, we ask for them
+        je second_operand_not_ok    ; again
+
+        cmp eax, 255                ; if length of string provided exceeded buffer      
+        ja critical                 ; we might have overwritten sth important
+                                    ; so we just end the program
+
+        cmp eax, 200                ; if we exceeded length of number
+        je second_operand_not_ok    ; but not the buffer, we can deal with it
+
+        mov ebx, input_buffer
+        add eax, ebx
+        dec eax
+        push ebx                    ; last argument - byte 0 of source string
+        push eax                    ; second argument - last byte of source address
+        push operand_2_num          ; first argument - destination for enourmous int
+        call parse
+        add esp, 12
+
+        cmp al, 0xFF                ; we catch any errors occured while parsing
+        je second_operand_not_ok
+
+        jmp second_operand_ok
+
+        second_operand_not_ok:
+        push message_err
+        call printf
+        add esp, 4
+
+        push DWORD 100          ; problem might have occured during string parsing
+        push DWORD 0x0          ; leaving rubbish in operand_1_num
+        push operand_2_num      ; we get rid of that to be able to
+        call memset             ; use that space for parsing again
+        add esp, 12
+
+        jmp second_operand
+
+
+        second_operand_ok:
+
+        ;call multiply_enormous
+
+        push message3
+        call printf
+        add esp, 4
+
+
+        ;#####################       
+
+        push DWORD 100
+        push DWORD 0x10
+        push operand_1_num
+        push output_num
+        call mul_enormous_by_const
+        add esp, 16
+
+        ;#####################
+
+        mov eax, output_num
+        mov ebx, 200
+        call print_large
+
+        jmp main_end
+
+        critical:
+
+        push message_crit
+        call printf
+        add esp, 4
+
+        main_end:
         pop ecx
         pop ebx         ; restore registers in reverse order
-        mov eax, 0      
-
-     ret
-     
-    open_file:
-        mov eax, FOPEN
-        mov ebx,[esp+4]
-        mov ecx, READ_ONLY
-        int SYS_CALL
-        mov [esp+4], eax
-        ret
-        
-    close_file:
-        mov eax, FCLOSE
-        mov ebx, [esp+4]
-        int SYS_CALL
-        ret
-        
-    ;3 arguments:
-    ;file descriptor
-    ;buffer address
-    ;number of bytes to read
-    ;push to stack in reversed order!
-    read_file:
-        mov eax, FREAD
-        mov ebx, [esp+4]
-        mov ecx, [esp+8]
-        mov edx, [esp+12]
-        int SYS_CALL
-        mov ecx, [esp+8]
-        mov bl, 0x0
-        mov [ecx+eax], bl       ;to assure string read from file is terminated with nul
-        ret
-
-    ;2 arguments:
-    ;file descriptor
-    ;long address to put value
-    ;not finished yet!
-    file_length:
-        mov eax, LSEEK
-        mov ebx, [esp + 4]
-        mov ecx, 0
-        mov edx, SEEK_END
-        int SYS_CALL
-
-        mov eax, [esp + 4]
-        push eax
-        call ftell
-        pop eax
-
-        mov ebx, [esp + 8]
-        mov [ebx], eax
-
-        
-
-        ret
-
-    ;4 arguments:
-    ;destination address
-    ;source address
-    ;number of bytes to xor
-    xor_strings:
-        mov ecx, [esp + 12]
-        mov edx, 0x0            ;loop counter
-
-        xstr_loop:
-            mov eax, [esp + 4]
-            mov ebx, [esp + 8]
-
-            mov al, [eax + edx]
-            mov bl, [ebx + edx]
-
-            xor bl, al
-
-            mov eax, [esp + 4]
-            mov [eax + edx], bl
-
-            inc edx
-            cmp edx, ecx
-            jb xstr_loop
-
-        ret
-
-    ;function to rotate string slightly up to seven bits
-    ;to the right
-    ;arguments:
-    ;string address
-    ;string length in bytes
-    ;offset
-    shift_string_small:
-        mov ebx, [esp + 4]
-        mov edx, [esp + 8]
-        mov ecx, [esp + 12]
-
-        add ebx, edx
-        dec ebx
-
         mov eax, 0
-        mov al, [ebx]
-        push eax        ;now arguments are 4 bytes further on the stack
-
-        sh_str_s_loop:
-            dec ebx
-            mov ax, [ebx]
-            shr ax, cl
-
-            inc ebx
-            mov [ebx], al
-            dec ebx
-
-            mov eax, [esp + 8]      ;string address
-            cmp ebx, eax
-            ja sh_str_s_loop
-
-        pop eax
-        mov ah, al
-        mov ebx, [esp + 4]
-        mov al, [ebx]
-
-        shr ax, cl
-
-        mov [ebx], al
 
         ret
 
+    ;parameters:
+    ;destination address        esp + 4
+    ;source last byte address   esp + 8
+    ;source zero byte address   esp + 12
+    parse:
+        mov edx, [esp + 4]      ;current byte's destination in edx
+        mov ecx, [esp + 8]      ;current char's source in ecx
 
-    ;rotates string by offset given in bytes
-    ;arguments:
-    ;string address
-    ;string length
-    ;offset
-    shift_string_big:
-        mov edx, [esp + 12]
-        push edx
+        parse_loop:
+        mov al, [ecx]
+        call parse_digit        ;translate character to 4-bit value
 
-        call malloc
+        cmp al, 0xFF
+        je parse_err            ;if there was an error when parsing this character
 
-        add esp, 4
-        mov ebx, [esp + 4]
-        mov ecx, [esp + 8]
-        mov edx, [esp + 12]
-
-        push eax                ; so we don't lose our pointer
-
-        add ebx, ecx
-        dec ebx
-
-        add eax, edx
-        dec eax
-
-        sh_buffer_loop:
-            push ebx
-            mov bl, [ebx]
-            mov [eax], bl
-            pop ebx
-            dec eax
-            dec ebx
-            cmp eax, [esp]
-            jae sh_buffer_loop
-
-        mov eax, ebx        ; source pointer
-        add ebx, edx        ; destination pointer
-
-        mov ecx, [esp + 8]  ; string address
-
-        sh_loop:
-            mov dl, [eax]
-            mov [ebx], dl
-            dec eax
-            dec ebx
-            cmp eax, ecx
-            jae sh_loop
-
-        mov eax, [esp]      ; buffer address
-        mov ebx, ecx        ; string address
-        add ecx, [esp + 16] ; first byte after first [offset] bytes in the string
-
-        sh_loop_2:
-            mov dl, [eax]
-            mov [ebx], dl
-            inc eax
-            inc ebx
-            cmp ebx, ecx
-            jb sh_loop_2
+        mov bl, al
+        push bx             ;we store our value on stack, so we can use al to call parse_digit again
         
-        ; top of stack is now buffer address
+        dec ecx
+        cmp ecx, [esp + 14]     ;if we just read last character but need one more
+        jb end_of_string
 
-        call free
+        mov al, [ecx]
+
+        call parse_digit        ;translate character to 4-bit value
+
+        cmp al, 0xFF
+        je parse_err_sec        ;if there was an error when parsing this character
+
+        jmp rest_of_loop
+        end_of_string:          ;we just pad the string with leading 0, no need to translate
+        mov al, 0x0
+
+        rest_of_loop:
+
+        mov ah, al              ;move older bits to ah
+
+        pop bx                  ;
+        ;mov ah, bl
+        mov al, bl              ;younger bits in al, older in ah
+        call merge_2_digits
+
+        mov [edx], al
+
+        inc edx
+        dec ecx
+        cmp ecx, [esp + 12]     ;if we haven't exceeded first character in the string yet
+        jae parse_loop          ;we loop
+
+        mov eax, 0x0
+        jmp parse_end
+
+        parse_err_sec:      ; if error occured after pushing bx, but before popping it
+        pop bx
+        parse_err:          ; if error occured before pushing bx
+        mov al, 0xFF
+        parse_end:
+        ret
+
+    ;ascii character in al 
+    ;translates HEX digit to 4-bit value, returns in al
+    ;returns 0xFF if character provided was no digit
+    parse_digit:
+        sub al, 0x30        ;we assume it is a decimal digit
+        cmp al, 0x0A        ;if so
+        jb parse_byte_end   ;we jump to return
+        sub al, 0x07        ;otherwise we assume it's from range A - F
+        cmp al, 0x0A        ;if it was below A, we return error code
+        jb parse_byte_err
+        cmp al, 0x10        ;if in the range, we return translated value
+        jb parse_byte_end
+        sub al, 0x20        ;if not, we assume it was from range a - f
+        cmp al, 0x0A        ;if below a, we return error code
+        jb parse_byte_err   
+        cmp al, 0x10
+        jb parse_byte_end   ;if in the range, we return translated value
+        parse_byte_err:     ;otherwise we return error code
+        mov al, 0xFF
+        parse_byte_end:
+        ret
+
+    ;parameters:
+    ;older 4 bits in ah
+    ;younger 4 bits in al
+    ;returns 8-bit value like ah|al in al
+    merge_2_digits:
+        shl ah, 0x04
+        add al, ah
+        ret
+
+    ;parameters:
+    ; first (youngest) byte address in eax
+    ; number of bytes in ebx (like sizeof(enormous_int_type))
+    ; we assume little-endiannes here!!!
+    print_large:
+        add ebx, eax
+        leading_zeros:  ; no need to print all the leading zeros
+            dec ebx     ; last byte of the enormous_int_type address
+            mov dl, [ebx]
+            cmp ebx, eax
+            jbe first_printable
+
+            cmp dl, 0x0
+            je leading_zeros
+
+        
+        first_printable:
+        push eax
+        push ebx
+        push edx
+        push formatout_hhx
+        call printf
+        add esp, 8
+        pop ebx
+        pop eax
+
+        p_large_loop:
+            dec ebx
+            cmp ebx, eax
+            jb p_large_end
+
+            push eax
+            push ebx
+            mov dl, [ebx]
+            push edx
+            push formatout_hhx_pad
+            call printf
+            add esp, 8
+            pop ebx
+            pop eax
+
+            jmp p_large_loop
+
+        p_large_end:
+
+        push DWORD 10
+        call putchar
         add esp, 4
 
         ret
 
-    ; arguments:
-    ; first lane address        [esp + 4]
-    ; second lane address       [esp + 8]
-    ; third lane address        [esp + 12]
-    ; destination address       [esp + 16]
-    ; lane length in bytes      [esp + 20]
-    chi_partial:
-        mov ecx, 0          ; byte counter
-        chi_partial_loop:
-            mov eax, [esp + 8]
-            mov al, [eax + ecx]
+    ;parameters:
+    ;first character in a string address in eax
+    ;returns number of characters in a string in eax
+    str_len:
+        push ecx
+        mov ecx, 0x0
+        mov bl, [eax + ecx]
+        cmp bl, 0x0
+        je str_len_end
 
-            ; not second lane
-            mov bl, 0xFF
-            xor al, bl
+        strlen_loop:
+        inc ecx
+        mov bl, [eax + ecx]
+        cmp bl, 0x0
+        jne strlen_loop
 
-            ; and third lane
+        dec eax
+        jmp str_len_end
+
+        str_len_end:
+        mov eax, ecx
+        pop ecx
+        ret
+
+    ;arguments:
+    ;destination        [esp + 4]
+    ;source             [esp + 8]
+    ;const              [esp + 12]
+    ;source length      [esp + 16]
+    mul_enormous_by_const:
+                ; prepare destination by setting all bits to 0
+        mov eax, [esp + 16]         ; max size of output
+        add eax, 4
+        mov ebx, [esp + 4]          ; dest address
+        push eax                    ; max output size
+        push DWORD 0x0              ; we want to reset all bits
+        push ebx                    ; destination address
+        call memset
+        add esp, 12
+
+        mov ebx, 0
+
+        mov ecx, [esp + 16]         ; operand length
+        and ecx, 0x3                ; equivalent of [eax]%3, but faster
+        ; ecx is counter now
+
+
+        multiplication_bytes:
+            cmp ecx, 0
+            je multiplication_bytes_end
+            dec ecx
+            mov ebx, [esp + 8]
+            mov eax, 0
+            mov al, [eax + ecx]     ; read interesting byte from memory
+            mov edx, [esp + 12]
+
+            mul edx
+
+            push ecx
+            mov ebx, [esp + 8]
+            add ebx, ecx
+            add [ebx], eax
+
+            bytes_while_carry:
+                adc [ebx + 4], edx
+                jc bytes_if_carry
+                add ebx, 4
+                mov edx, 0
+                jmp bytes_while_carry_end
+
+                bytes_if_carry:
+                    add ebx, 4
+                    mov edx, 0
+                    stc
+
+                bytes_while_carry_end:
+                    jc while_carry          ; we keep propagating carry while there is any
+            pop ecx
+
+            jmp multiplication_bytes
+        multiplication_bytes_end:
+
+
+        mov ebx, 0
+
+        mov ecx, [esp + 16]         ; operand length
+        and ecx, 0x3                ; ecx is index now
+
+        mov ebx, [esp + 8]          ; ebx is the beginning of source aligned by 4
+        add ebx, ecx
+
+        mov ecx, [esp + 16]
+        shr ecx, 2
+
+
+        multiplication_dwords:
+            cmp ecx, 0
+            je multiplication_dwords_end
+            dec ecx
+            mov eax, [ebx, ecx * 4]
+            mov edx, [esp + 12]
+
+            mul edx
+            
+            push ebx
+            push ecx
             mov ebx, [esp + 12]
-            mov bl, [ebx + ecx]
-            and al, bl
+            add [ebx, ecx * 4], eax
 
-            ; xor first lane
-            mov ebx, [esp + 4]
-            mov bl, [ebx + ecx]
-            xor al, bl
+            dwords_while_carry:
+                inc ecx
+                adc [ebx, ecx * 4], edx
+                mov edx, 0
+                jc while_carry          ; we keep propagating carry while there is any
+            pop ecx
+            pop ebx
 
-            ; write output to destination string
-            mov ebx, [esp + 16]
-            mov [ebx + ecx], al
+            jmp multiplication_dwords
 
-            inc ecx
+        multiplication_dwords_end:
 
-            cmp ecx, [esp + 20]
-            jb chi_partial_loop
+        ret
+
+
+    multiply_enormous:
+        ; prepare destination by setting all bits to 0
+        push DWORD 200          ; twice the length of operand
+        push DWORD 0x0          ; we want to reset all bits
+        push output_num         ; destination address
+        call memset
+        add esp, 12
+
+        mov ebx, 0
+        ;multiplication algorithm
+        mul_ext_loop:
+
+        mov ecx, 0
+
+        mul_inner_loop:
+            mov eax, [operand_1_num + ebx]
+            mov edx, [operand_2_num + ecx]
+            mul edx
+
+            push ecx                ; temporarily we need ecx for destination address
+            add ecx, output_num     ; of current byte
+            add ecx, ebx
+            clc
+
+            add [ecx], eax          ; we add younger bits of multiplying
+            add ecx, 4              ; properly shifted to output
+
+            while_carry:
+            adc [ecx], edx          ; the same about older bits, but with carry
+          jc if_carry
+            add ecx, 4
+            mov edx, 0
+          jmp while_carry_end
+
+          if_carry:
+          add ecx, 4
+          mov edx, 0
+          stc
+
+          while_carry_end:
+            jc while_carry          ; we keep propagating carry while there is any
+
+            pop ecx                 ; we want our counter back
+            add ecx, 4
+            cmp ecx, 100
+            jb mul_inner_loop       ; while counter is lower than 100
+
+        add ebx, 4
+        cmp ebx, 100
+        jb mul_ext_loop             ; while counter < 100
+
         ret
