@@ -152,7 +152,7 @@ SECTION .text
         ;#####################       
 
         push DWORD 100
-        push DWORD 0x10
+        push DWORD 0xA
         push operand_1_num
         push output_num
         call mul_enormous_by_const
@@ -496,3 +496,106 @@ SECTION .text
         jb mul_ext_loop             ; while counter < 100
 
         ret
+
+    add_enormous:
+        ; prepare destination by setting all bits to 0
+        push DWORD 200          ; twice the length of operand
+        push DWORD 0x0          ; we want to reset all bits
+        push output_num         ; destination address
+        call memset
+        add esp, 12
+
+        mov ecx, 0                  ; ecx is index
+
+        clc
+
+        add_loop:
+            mov eax, [operand_1_num, ecx * 4]
+            mov edx, [operand_2_num, ecx * 4]
+            adc eax, edx
+
+            mov [output_num, ecx * 4], eax
+
+            inc ecx
+
+            cmp ecx, 25
+            jb add_loop             ; while counter < 100
+
+        mov eax, 0
+        adc eax, 0
+        mov [output_num + 100], eax
+
+        ret
+
+    ; arguments:
+    ; adres odjemnej    esp + 4
+    ; adres odjemnika   esp + 8
+
+    sub_enormous:
+        ; prepare destination by setting all bits to 0
+        push DWORD 200          ; twice the length of operand
+        push DWORD 0x0          ; we want to reset all bits
+        push output_num         ; destination address
+        call memset
+        add esp, 12
+
+        mov ecx, 0                  ; ecx is index
+
+        clc
+
+        sub_loop:
+            mov eax, [esp + 4]
+            mov eax, [eax, ecx * 4]
+            mov edx, [esp + 8]
+            mov edx, [edx, ecx * 4]
+            sbb eax, edx
+
+            mov [output_num, ecx * 4], eax
+
+            inc ecx
+
+            cmp ecx, 25
+            jb sub_loop             ; while counter < 100
+
+        mov eax, 0
+        sbb eax, 0
+        mov [output_num + 100], eax
+
+        ret
+
+        ; arguments:
+        ; eax adres pierwszej liczby
+        ; ebx adres drugiej liczby
+        ; ecx rozmiar liczb w bajtach
+        ; zwraca w eax
+        ; 0xFF jezeli pierwsza mniejsza
+        ; 0 jezeli rowne
+        ; 0x1 jezeli druga mniejsza
+        compare_enormous:
+            cmp ecx, 0
+            jmp cmp_equal
+
+            dec ecx
+
+            mov dl, [eax + ecx]
+            cmp dl, [ebx + ecx]
+            
+            jb cmp_second_larger
+            ja cmp_first_larger
+
+            jmp compare_enormous
+
+
+            cmp_equal:
+                mov eax, 0
+                jmp compare_end
+
+            cmp_first_larger:
+                mov eax, 1
+                jmp compare_end
+
+            cmp_second_larger:
+                mov eax, 0xFF
+
+            compare_end:
+            ret
