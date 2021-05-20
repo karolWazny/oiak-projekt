@@ -152,11 +152,17 @@ SECTION .text
         ;#####################       
 
         push DWORD 100
-        push DWORD 0xA
+        push DWORD 0x1
         push operand_1_num
         push output_num
         call mul_enormous_by_const
         add esp, 16
+
+        push DWORD 3
+        push DWORD 200
+        push output_num
+        call shift_huge_left
+        add esp, 12
 
         ;#####################
 
@@ -571,33 +577,33 @@ SECTION .text
         ; 0xFF jezeli pierwsza mniejsza
         ; 0 jezeli rowne
         ; 0x1 jezeli druga mniejsza
-        compare_enormous:
-            cmp ecx, 0
-            jmp cmp_equal
+    compare_enormous:
+        cmp ecx, 0
+        jmp cmp_equal
 
-            dec ecx
+        dec ecx
 
-            mov dl, [eax + ecx]
-            cmp dl, [ebx + ecx]
+        mov dl, [eax + ecx]
+        cmp dl, [ebx + ecx]
             
-            jb cmp_second_larger
-            ja cmp_first_larger
+        jb cmp_second_larger
+        ja cmp_first_larger
 
-            jmp compare_enormous
+        jmp compare_enormous
 
 
-            cmp_equal:
-                mov eax, 0
-                jmp compare_end
+        cmp_equal:
+            mov eax, 0
+            jmp compare_end
 
-            cmp_first_larger:
-                mov eax, 1
-                jmp compare_end
+        cmp_first_larger:
+            mov eax, 1
+            jmp compare_end
 
-            cmp_second_larger:
-                mov eax, 0xFF
+        cmp_second_larger:
+            mov eax, 0xFF
 
-            compare_end:
+        compare_end:
             ret
 
 
@@ -605,37 +611,74 @@ SECTION .text
         ; eax - adres referencyjny
         ; ebx - offset (w BITACH!)
         ; ecx - wartosc bitu
-        write_bit:
-            push ebx
+    write_bit:
+        push ebx
 
-            shr ebx, 3
-            add eax, ebx
+        shr ebx, 3
+        add eax, ebx
 
-            pop ebx
-            and ebx, 0x7
+        pop ebx
+        and ebx, 0x7
 
-            push ecx
+        push ecx
 
-            mov ecx, ebx
-            mov edx, 1
-            shl edx, cl
+        mov ecx, ebx
+        mov edx, 1
+        shl edx, cl
 
-            pop ecx
+        pop ecx
 
-            cmp ecx, 0
-            jne write_one
+        cmp ecx, 0
+        jne write_one
 
-            write_zero:
-                mov cl, [eax]
-                not dl
-                and cl, dl
-                mov [eax], cl
-                jmp write_bit_end
+        write_zero:
+            mov cl, [eax]
+            not dl
+            and cl, dl
+            mov [eax], cl
+            jmp write_bit_end
 
-            write_one:
-                mov cl, [eax]
-                or cl, dl
-                mov [eax], cl
+        write_one:
+            mov cl, [eax]
+            or cl, dl
+            mov [eax], cl
 
-            write_bit_end:
+        write_bit_end:
             ret
+
+    ; przesuniecie jest koncepcyjnie w lewo (zwiekszenie wartosci)
+    ; ale w pamieci bity sa przesuwane w prawo ze wzgledu na
+    ; konwencje little-endian
+    ; argumenty:
+    ; poczatek                  [esp + 4]
+    ; dlugosc w bajtach         [esp + 8]
+    ; przesuniecie w bajtach    [esp + 12]
+    shift_huge_left:
+        mov eax, [esp + 4]
+        add eax, [esp + 8]
+        mov ebx, eax
+        sub ebx, [esp + 12]
+        
+        shift_loop:
+            cmp eax, [esp + 4]
+            jbe shift_loop_end
+
+            sub eax, 4
+            sub ebx, 4
+
+            mov ecx, [ebx]
+            mov [eax], ecx
+
+            jmp shift_loop
+        shift_loop_end:
+
+        mov eax, [esp + 12]
+        mov ebx, [esp + 4]
+
+        push eax
+        push DWORD 0x0
+        push ebx
+        call memset
+        add esp, 12
+
+        ret
