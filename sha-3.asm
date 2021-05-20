@@ -158,11 +158,10 @@ SECTION .text
         call mul_enormous_by_const
         add esp, 16
 
-        push DWORD 3
         push DWORD 200
         push output_num
-        call shift_huge_left
-        add esp, 12
+        call shift_bit_right
+        add esp, 8
 
         ;#####################
 
@@ -680,5 +679,32 @@ SECTION .text
         push ebx
         call memset
         add esp, 12
+
+        ret
+
+    ; argumenty
+    ; poczatek liczby       [esp + 4]
+    ; dlugosc liczby        [esp + 8]
+    shift_bit_right:
+        mov edx, [esp + 4]
+        mov ecx, 0
+
+        sh_b_right_loop:
+            cmp ecx, [esp + 8]
+            jae shr_loop_end
+
+            mov ax, [edx + ecx]
+            shr ax, 1
+            mov [edx + ecx], al
+
+            inc ecx
+
+            jmp sh_b_right_loop
+        shr_loop_end:
+        mov edx, [esp + 4]
+        add edx, [esp + 8]
+        mov al, [edx]
+        and al, 0x7F
+        mov [edx], al
 
         ret
