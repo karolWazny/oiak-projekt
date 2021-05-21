@@ -151,17 +151,7 @@ SECTION .text
 
         ;#####################       
 
-        push DWORD 100
-        push DWORD 0x1
-        push operand_1_num
-        push output_num
-        call mul_enormous_by_const
-        add esp, 16
-
-        push DWORD 200
-        push output_num
-        call shift_bit_right
-        add esp, 8
+        call divide_enormous
 
         ;#####################
 
@@ -537,13 +527,6 @@ SECTION .text
     ; adres odjemnika   esp + 8
 
     sub_enormous:
-        ; prepare destination by setting all bits to 0
-        push DWORD 200          ; twice the length of operand
-        push DWORD 0x0          ; we want to reset all bits
-        push output_num         ; destination address
-        call memset
-        add esp, 12
-
         mov ecx, 0                  ; ecx is index
 
         clc
@@ -555,16 +538,32 @@ SECTION .text
             mov edx, [edx, ecx * 4]
             sbb eax, edx
 
-            mov [output_num, ecx * 4], eax
+            mov ebx, [esp + 4]
+            mov [ebx, ecx * 4], eax
 
             inc ecx
 
-            cmp ecx, 25
-            jb sub_loop             ; while counter < 100
+            jc sub_if_carry
+
+            sub_not_carry:
+                cmp ecx, 25
+                jae sub_loop_end            ; while counter < 100
+                clc
+                jmp sub_loop
+
+            sub_if_carry:
+                cmp ecx, 25
+                jae sub_loop_end            ; while counter < 100
+                stc
+                jmp sub_loop
+
+        sub_loop_end:
+
+
 
         mov eax, 0
         sbb eax, 0
-        mov [output_num + 100], eax
+        mov [ebx + 100], eax
 
         ret
 
@@ -578,7 +577,7 @@ SECTION .text
         ; 0x1 jezeli druga mniejsza
     compare_enormous:
         cmp ecx, 0
-        jmp cmp_equal
+        je cmp_equal
 
         dec ecx
 
@@ -706,5 +705,98 @@ SECTION .text
         mov al, [edx]
         and al, 0x7F
         mov [edx], al
+
+        ret
+
+    ; tu rezygnujemy z ponownego wykorzystania kodu
+    ; i dzialamy na zmiennych statycznych,
+    ; ten kod i tak bedzie sie dlugo wykonywal
+    ; wynik dzielenia w output_num, reszta w operand_1_num
+    divide_enormous:
+
+        push DWORD 200
+        push DWORD 0
+        push output_num
+        call memset
+        add esp, 12
+
+        mov eax, 0
+        
+        rescale_divisor_loop:
+            push eax
+            mov eax, operand_1_num
+            mov ebx, operand_2_num
+            mov ecx, 100
+            call compare_enormous
+            cmp eax, 1
+            pop eax
+            jne rescale_divisor_loop_end
+
+            inc eax
+            push eax
+
+            push DWORD 1
+            push DWORD 100
+            push operand_2_num
+            call shift_huge_left
+            add esp, 12
+
+            pop eax
+
+            jmp rescale_divisor_loop
+        rescale_divisor_loop_end:
+
+        ; w eax mamy liczbe bajtow o ktora
+        ; przeskalowalismy dzielnik
+        mov ebx, 8
+        mul ebx    ; teraz mamy juz liczbe bitow w eax
+
+        divide_loop:
+            push eax
+
+            mov eax, operand_1_num
+            mov ebx, operand_2_num
+            mov ecx, 100
+            call compare_enormous
+
+            cmp eax, 0xFF
+            je div_writ_0
+
+            div_writ_1:
+                ; write_bit(output_num, eax, 1)
+                mov eax, output_num
+                mov ebx, [esp]
+                mov ecx, 1
+                call write_bit
+
+                push operand_2_num
+                push operand_1_num
+                call sub_enormous
+                add esp, 8
+
+                jmp div_writ_end
+
+            div_writ_0:
+                ; write_bit(output_num, eax, 0)
+                mov eax, output_num
+                mov ebx, [esp]
+                mov ecx, 0
+                call write_bit
+
+            div_writ_end:
+                push DWORD 100
+                push operand_2_num
+                call shift_bit_right
+                add esp, 8
+
+                pop eax
+                dec eax
+
+                cmp eax, 0
+                jl divide_loop_end
+
+                jmp divide_loop
+
+        divide_loop_end:
 
         ret
