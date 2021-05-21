@@ -532,6 +532,7 @@ SECTION .text
         clc
 
         sub_loop:
+
             mov eax, [esp + 4]
             mov eax, [eax, ecx * 4]
             mov edx, [esp + 8]
@@ -558,12 +559,6 @@ SECTION .text
                 jmp sub_loop
 
         sub_loop_end:
-
-
-
-        mov eax, 0
-        sbb eax, 0
-        mov [ebx + 100], eax
 
         ret
 
