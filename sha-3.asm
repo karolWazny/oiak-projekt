@@ -255,9 +255,28 @@ SECTION .text
         ret
 
     subtracting:
+        mov eax, operand_1_num
+        mov ebx, operand_2_num
+        mov ecx, 100
+        call compare_enormous
 
-        push operand_2_num
+        push DWORD 0
         push operand_1_num
+        mov ebx, operand_2_num
+        mov ecx, operand_1_num
+        cmp eax, 0xFF
+        jne change_order_end    
+    
+        change_order:
+            add esp, 8
+            push DWORD 1
+            push operand_2_num
+            mov ebx, operand_1_num
+            mov ecx, operand_2_num      
+        change_order_end:
+
+        push ebx
+        push ecx
         call sub_enormous
         add esp, 8
 
@@ -265,10 +284,19 @@ SECTION .text
         call printf
         add esp, 4
 
-        mov eax, operand_1_num
+    mov eax, [esp + 4]
+
+    cmp eax, 0
+    je print_module
+    push DWORD '-'
+    call putchar
+    add esp, 4
+    
+    print_module:
+        pop eax
+        add esp, 4
         mov ebx, 100
         call print_large
-
         ret
 
     multiplying:
