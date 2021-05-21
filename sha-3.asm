@@ -11,6 +11,9 @@ SECTION .data
         message3: db "Result: ", 10,"0x", 0
         message_err: db "Wrong operand!", 10, 0
         message_crit: db "Problem occured. Ending program...", 10, 0
+        message_div_zer: db "Error: Attempt to divide by zero.", 10, 0
+
+        message_res: db "Residue:",10,"0x", 0
 
         message_menu: db "Choose operation:",10,"1. +", 10, "2. -", 10, "3. *", 10, "4. /", 10, 0
 
@@ -193,9 +196,33 @@ SECTION .text
 
         ;call multiply_enormous
 
-        call adding
+        mov eax, [operation_id]
+        cmp eax, 1
+        je call_adding
 
-        jmp main_end
+        cmp eax, 2
+        je call_subtracting
+
+        cmp eax, 3
+        je call_multiplying
+
+        jmp call_dividing
+
+        call_adding:
+            call adding
+            jmp main_end
+
+        call_subtracting:
+            call subtracting
+            jmp main_end
+
+        call_multiplying:
+            call multiplying
+            jmp main_end
+
+        call_dividing:
+            call dividing
+            jmp main_end
 
         critical:
 
@@ -228,12 +255,73 @@ SECTION .text
         ret
 
     subtracting:
+
+        push operand_2_num
+        push operand_1_num
+        call sub_enormous
+        add esp, 8
+
+        push message3
+        call printf
+        add esp, 4
+
+        mov eax, operand_1_num
+        mov ebx, 100
+        call print_large
+
         ret
 
     multiplying:
+        call multiply_enormous
+        push message3
+        call printf
+        add esp, 4
+
+        mov eax, output_num
+        mov ebx, 200
+        call print_large
+
         ret
 
     dividing:
+        push DWORD 200
+        push DWORD 0x0
+        push output_num
+        call memset
+        add esp, 12
+
+        mov eax, operand_2_num
+        mov ebx, output_num
+        call compare_enormous
+        cmp eax, 0
+        je divide_by_zero
+
+        call divide_enormous
+
+        push message3
+        call printf
+        add esp, 4
+
+        mov eax, output_num
+        mov ebx, 200
+        call print_large
+
+        push message_res
+        call printf
+        add esp, 4
+
+        mov eax, operand_1_num
+        mov ebx, 100
+        call print_large
+
+        jmp dividing_end
+
+        divide_by_zero:
+            push message_div_zer
+            call printf
+            add esp, 4
+
+        dividing_end:
         ret
 
     ;parameters:
@@ -591,6 +679,8 @@ SECTION .text
 
         add_loop_end:
 
+        mov eax, [operand_1_num + 96]
+        add eax, [operand_2_num + 96]
         mov eax, 0
         adc eax, 0
         mov [output_num + 100], eax
