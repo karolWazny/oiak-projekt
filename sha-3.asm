@@ -8,9 +8,11 @@ SECTION .data
  
         message1: db "Enter first operand in hex: 0x", 0
         message2: db "Enter second operand in hex: 0x", 0
-        message3: db "Multiplication result: ", 10,"0x", 0
+        message3: db "Result: ", 10,"0x", 0
         message_err: db "Wrong operand!", 10, 0
         message_crit: db "Problem occured. Ending program...", 10, 0
+
+        message_menu: db "Choose operation:",10,"1. +", 10, "2. -", 10, "3. *", 10, "4. /", 10, 0
 
         formatins: db "%s", 0
         formatout_hhx_pad: db "%02hhX", 0
@@ -23,6 +25,8 @@ SECTION .data
         
 SECTION .bss
         input_buffer: resb 256
+
+        operation_id: resb 4
         
 
 SECTION .text
@@ -35,8 +39,53 @@ SECTION .text
         extern putchar
 
      main:
-        push ebx        ;save registers
-        push ecx
+
+        menu:
+            push message_menu
+            call printf
+            add esp, 4
+
+            push input_buffer
+            push formatins
+            call scanf
+            add esp, 8
+
+            mov al, [input_buffer]
+
+            cmp al, '1'
+            je op_1
+            cmp al, '+'
+            je op_1
+            cmp al, '2'
+            je op_2
+            cmp al, '-'
+            je op_2
+            cmp al, '3'
+            je op_3
+            cmp al, '*'
+            je op_3
+            cmp al, '4'
+            je op_4
+            cmp al, '/'
+            je op_4
+
+        jmp menu
+
+        op_1:
+            mov DWORD [operation_id], 1
+            jmp first_operand
+
+        op_2:
+            mov DWORD [operation_id], 2
+            jmp first_operand
+
+        op_3:
+            mov DWORD [operation_id], 3
+            jmp first_operand
+
+        op_4:
+            mov DWORD [operation_id], 4
+            jmp first_operand
 
         first_operand:
 
@@ -144,20 +193,7 @@ SECTION .text
 
         ;call multiply_enormous
 
-        push message3
-        call printf
-        add esp, 4
-
-
-        ;#####################       
-
-        call divide_enormous
-
-        ;#####################
-
-        mov eax, output_num
-        mov ebx, 200
-        call print_large
+        call adding
 
         jmp main_end
 
@@ -168,10 +204,36 @@ SECTION .text
         add esp, 4
 
         main_end:
-        pop ecx
-        pop ebx         ; restore registers in reverse order
         mov eax, 0
 
+        ret
+
+    adding:
+
+        push DWORD 200
+        push DWORD 0x0
+        push output_num
+        call memset
+        add esp, 12
+
+        call add_enormous
+        push message3
+        call printf
+        add esp, 4
+
+        mov eax, output_num
+        mov ebx, 200
+        call print_large
+
+        ret
+
+    subtracting:
+        ret
+
+    multiplying:
+        ret
+
+    dividing:
         ret
 
     ;parameters:
@@ -513,8 +575,21 @@ SECTION .text
 
             inc ecx
 
-            cmp ecx, 25
-            jb add_loop             ; while counter < 100
+            jc add_if_carry
+
+            add_not_carry:
+                cmp ecx, 25
+                jae add_loop_end            ; while counter < 100
+                clc
+                jmp add_loop
+
+            add_if_carry:
+                cmp ecx, 25
+                jae add_loop_end            ; while counter < 100
+                stc
+                jmp add_loop
+
+        add_loop_end:
 
         mov eax, 0
         adc eax, 0
