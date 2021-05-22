@@ -506,6 +506,34 @@ SECTION .text
             call mul_enormous_by_const
             add esp, 16
 
+
+
+
+
+        ; ###########################
+
+        push eax
+        push ebx
+        push ecx
+        push edx
+
+        mov eax, output_num
+        mov ebx, 200
+        call print_large
+
+        mov eax, operand_1_num
+        mov ebx, 100
+        call print_large
+
+        pop edx
+        pop ecx
+        pop ebx
+        pop eax
+
+        ; ###########################
+
+
+
             mov eax, 0
             mov ebx, [esp + 20]
 
@@ -918,6 +946,7 @@ SECTION .text
         clc
 
         add_loop:
+
             mov eax, [operand_1_num, ecx * 4]
             mov edx, [operand_2_num, ecx * 4]
             adc eax, edx
@@ -1053,13 +1082,16 @@ SECTION .text
         jne write_one
 
         write_zero:
+
             mov cl, [eax]
             not dl
             and cl, dl
             mov [eax], cl
+
             jmp write_bit_end
 
         write_one:
+
             mov cl, [eax]
             or cl, dl
             mov [eax], cl
@@ -1108,6 +1140,7 @@ SECTION .text
     ; poczatek liczby       [esp + 4]
     ; dlugosc liczby        [esp + 8]
     shift_bit_right:
+
         mov edx, [esp + 4]
         mov ecx, 0
 
@@ -1123,8 +1156,10 @@ SECTION .text
 
             jmp sh_b_right_loop
         shr_loop_end:
+
         mov edx, [esp + 4]
         add edx, [esp + 8]
+        dec edx
         mov al, [edx]
         and al, 0x7F
         mov [edx], al
@@ -1169,6 +1204,7 @@ SECTION .text
             jmp rescale_divisor_loop
         rescale_divisor_loop_end:
 
+
         ; w eax mamy liczbe bajtow o ktora
         ; przeskalowalismy dzielnik
         mov ebx, 8
@@ -1190,6 +1226,7 @@ SECTION .text
                 mov eax, output_num
                 mov ebx, [esp]
                 mov ecx, 1
+
                 call write_bit
 
                 push operand_2_num
@@ -1207,6 +1244,7 @@ SECTION .text
                 call write_bit
 
             div_writ_end:
+
                 push DWORD 100
                 push operand_2_num
                 call shift_bit_right
@@ -1221,5 +1259,57 @@ SECTION .text
                 jmp divide_loop
 
         divide_loop_end:
+
+        ret
+
+
+    ;parameters:
+    ; first (youngest) byte address in eax
+    ; number of bytes in ebx (like sizeof(enormous_int_type))
+    ; we assume little-endiannes here!!!
+    print_large:
+        add ebx, eax
+        leading_zeros:  ; no need to print all the leading zeros
+            dec ebx     ; last byte of the enormous_int_type address
+            mov dl, [ebx]
+            cmp ebx, eax
+            jbe first_printable
+
+            cmp dl, 0x0
+            je leading_zeros
+
+        
+        first_printable:
+        push eax
+        push ebx
+        push edx
+        push formatout_hhx
+        call printf
+        add esp, 8
+        pop ebx
+        pop eax
+
+        p_large_loop:
+            dec ebx
+            cmp ebx, eax
+            jb p_large_end
+
+            push eax
+            push ebx
+            mov dl, [ebx]
+            push edx
+            push formatout_hhx_pad
+            call printf
+            add esp, 8
+            pop ebx
+            pop eax
+
+            jmp p_large_loop
+
+        p_large_end:
+
+        push DWORD 10
+        call putchar
+        add esp, 4
 
         ret
