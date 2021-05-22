@@ -214,11 +214,37 @@ SECTION .text
         jmp call_dividing
 
         call_adding:
-            call adding
+            mov eax, [operand_1_sign]
+            mov ebx, [operand_2_sign]
+
+            xor eax, ebx
+            cmp eax, 0
+            jne c_add_sub
+
+            c_add_add:
+                call adding
+                jmp c_add_sub_end
+            c_add_sub:
+                call subtracting
+            c_add_sub_end:
+
             jmp main_end
 
         call_subtracting:
-            call subtracting
+            mov eax, [operand_1_sign]
+            mov ebx, [operand_2_sign]
+
+            xor eax, ebx
+            cmp eax, 0
+            jne c_sub_add
+
+            c_sub_sub:
+                call subtracting
+                jmp c_sub_add_end
+            c_sub_add:
+                call adding
+            c_sub_add_end:
+
             jmp main_end
 
         call_multiplying:
@@ -253,6 +279,15 @@ SECTION .text
         call printf
         add esp, 4
 
+        mov eax, [operand_1_sign]
+        cmp eax, 0
+        je p_ad_mod
+
+        push DWORD '-'
+        call putchar
+        add esp, 4
+
+        p_ad_mod:
         mov eax, output_num
         mov ebx, 200
         call print_large_dec
@@ -297,6 +332,8 @@ SECTION .text
         add esp, 4
 
     mov eax, [esp + 4]
+    mov ebx, [operand_1_num]
+    xor eax, ebx
 
     cmp eax, 0
     je print_module
