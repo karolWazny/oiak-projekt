@@ -6,8 +6,8 @@
 
 SECTION .data
  
-        message1: db "Enter first operand in hex: 0x", 0
-        message2: db "Enter second operand in hex: 0x", 0
+        message1: db "Enter first operand: ", 0
+        message2: db "Enter second operand: ", 0
         message3: db "Result: ", 10,"0x", 0
         message_err: db "Wrong operand!", 10, 0
         message_crit: db "Problem occured. Ending program...", 10, 0
@@ -22,7 +22,9 @@ SECTION .data
         formatout_hhx: db "%hhX", 0
         formatouts: db "%s", 10, 0
 
+        operand_1_sign: times 4 db 0
         operand_1_num: times 100 db 0
+        operand_2_sign: times 4 db 0
         operand_2_num: times 100 db 0
         output_num: times 200 db 0
         
@@ -110,16 +112,20 @@ SECTION .text
         ja critical             ; we might have overwritten sth important
                                 ; so we just end the program
 
-        cmp eax, 200            ; if we exceeded length of number
-        je first_operand_not_ok ; but not the buffer, we can deal with it
+        cmp eax, 240            ; if we exceeded length of number
+        ja first_operand_not_ok ; but not the buffer, we can deal with it
 
-        mov ebx, input_buffer
-        add eax, ebx
-        dec eax
-        push ebx                ; last argument - byte 0 of source string
-        push eax                ; second argument - last byte of source address
-        push operand_1_num      ; first argument - destination for enourmous int
-        call parse
+        ;mov ebx, input_buffer
+        ;add eax, ebx
+        ;dec eax
+        ;push ebx                ; last argument - byte 0 of source string
+        ;push eax                ; second argument - last byte of source address
+        ;push operand_1_num      ; first argument - destination for enourmous int
+
+        push input_buffer
+        push operand_1_sign
+        push operand_1_num
+        call parse_signed_dec
         add esp, 12
 
         cmp al, 0xFF            ; we catch any errors occured while parsing
@@ -161,16 +167,13 @@ SECTION .text
         ja critical                 ; we might have overwritten sth important
                                     ; so we just end the program
 
-        cmp eax, 200                ; if we exceeded length of number
-        je second_operand_not_ok    ; but not the buffer, we can deal with it
+        cmp eax, 240                ; if we exceeded length of number
+        ja second_operand_not_ok    ; but not the buffer, we can deal with it
 
-        mov ebx, input_buffer
-        add eax, ebx
-        dec eax
-        push ebx                    ; last argument - byte 0 of source string
-        push eax                    ; second argument - last byte of source address
-        push operand_2_num          ; first argument - destination for enourmous int
-        call parse
+        push input_buffer
+        push operand_2_sign
+        push operand_2_num
+        call parse_signed_dec
         add esp, 12
 
         cmp al, 0xFF                ; we catch any errors occured while parsing
@@ -255,6 +258,13 @@ SECTION .text
         ret
 
     subtracting:
+
+        push DWORD 200
+        push DWORD 0x0
+        push output_num
+        call memset
+        add esp, 12
+
         mov eax, operand_1_num
         mov ebx, operand_2_num
         mov ecx, 100
@@ -350,6 +360,88 @@ SECTION .text
             add esp, 4
 
         dividing_end:
+        ret
+
+    ; parameters:
+    ; destination address        esp + 4
+    ; destination sign address   esp + 8
+    ; source beginning           esp + 12
+    parse_signed_dec:
+        mov eax, [esp + 12]
+        mov bl, [eax]
+
+        mov ecx, [esp + 12]
+        mov ebx, [esp + 4]
+
+        cmp bl, '-'
+        jne not_minus
+
+        minus:
+            mov eax, [esp + 8]
+            mov DWORD [eax], 1
+            inc ecx
+            jmp sign_end
+
+        not_minus:
+            mov eax, [esp + 8]
+            mov DWORD [eax], 0
+        sign_end:
+
+        mov eax, 0
+
+        parse_dec_loop:
+            mov dl, [ecx]
+            cmp dl, 0x0
+            je parse_dec_end
+
+            sub dl, 0x30
+            cmp dl, 0xA
+            jae parse_dec_err
+
+            push eax
+            push ebx
+            push ecx
+            push edx
+
+            push DWORD 200
+            push DWORD 0x0
+            push output_num
+            call memset
+            add esp, 12
+
+            push DWORD 100
+            push DWORD 10
+            push ebx
+            push output_num
+            call mul_enormous_by_const
+            add esp, 16
+
+            mov eax, 0
+            mov ebx, [esp + 20]
+
+            rewrite_loop:
+                mov edx, [output_num, eax * 4]
+                mov [ebx, eax * 4], edx
+                inc eax
+                cmp eax, 25
+                jb rewrite_loop
+
+            pop edx
+            pop ecx
+            pop ebx
+            pop eax
+
+            add [ebx], dl
+
+
+        deb_lab:
+
+        inc ecx
+        jmp parse_dec_loop
+
+        parse_dec_err:
+            mov eax, 0xFF
+        parse_dec_end:
         ret
 
     ;parameters:
