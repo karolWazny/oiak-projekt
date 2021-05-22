@@ -8,12 +8,12 @@ SECTION .data
  
         message1: db "Enter first operand: ", 0
         message2: db "Enter second operand: ", 0
-        message3: db "Result: ", 10,"0x", 0
+        message3: db "Result: ", 10, 0
         message_err: db "Wrong operand!", 10, 0
         message_crit: db "Problem occured. Ending program...", 10, 0
         message_div_zer: db "Error: Attempt to divide by zero.", 10, 0
 
-        message_res: db "Residue:",10,"0x", 0
+        message_res: db "Residue:",10, 0
 
         message_menu: db "Choose operation:",10,"1. +", 10, "2. -", 10, "3. *", 10, "4. /", 10, 0
 
@@ -23,7 +23,7 @@ SECTION .data
         formatouts: db "%s", 10, 0
 
         operand_1_sign: times 4 db 0
-        operand_1_num: times 100 db 0
+        operand_1_num: times 200 db 0
         operand_2_sign: times 4 db 0
         operand_2_num: times 100 db 0
         output_num: times 200 db 0
@@ -42,6 +42,8 @@ SECTION .text
         extern printf
         extern memset
         extern putchar
+        extern malloc
+        extern free
 
      main:
 
@@ -253,7 +255,7 @@ SECTION .text
 
         mov eax, output_num
         mov ebx, 200
-        call print_large
+        call print_large_dec
 
         ret
 
@@ -304,9 +306,18 @@ SECTION .text
     
     print_module:
         pop eax
+        mov ebx, 0
+        op_to_output_loop:
+            mov ecx, [eax, ebx * 4]
+            mov [output_num, ebx * 4], ecx
+            inc ebx
+            cmp ebx, 25
+            jb op_to_output_loop
+
         add esp, 4
-        mov ebx, 100
-        call print_large
+        mov eax, output_num
+        mov ebx, 200
+        call print_large_dec
         ret
 
     multiplying:
@@ -317,7 +328,7 @@ SECTION .text
 
         mov eax, output_num
         mov ebx, 200
-        call print_large
+        call print_large_dec
 
         ret
 
@@ -342,7 +353,7 @@ SECTION .text
 
         mov eax, output_num
         mov ebx, 200
-        call print_large
+        call print_large_dec
 
         push message_res
         call printf
@@ -350,7 +361,7 @@ SECTION .text
 
         mov eax, operand_1_num
         mov ebx, 100
-        call print_large
+        call print_large_dec
 
         jmp dividing_end
 
@@ -433,9 +444,6 @@ SECTION .text
 
             add [ebx], dl
 
-
-        deb_lab:
-
         inc ecx
         jmp parse_dec_loop
 
@@ -444,94 +452,201 @@ SECTION .text
         parse_dec_end:
         ret
 
-    ;parameters:
-    ;destination address        esp + 4
-    ;source last byte address   esp + 8
-    ;source zero byte address   esp + 12
-    parse:
-        mov edx, [esp + 4]      ;current byte's destination in edx
-        mov ecx, [esp + 8]      ;current char's source in ecx
+    ; parametry:
+    ; eax - source
+    ; ebx - number of bytes
+    print_large_dec:
+        push eax
+        push ebx
+        push DWORD 500
+        call malloc
+        add esp, 4
+        mov edx, eax
+        pop ebx
+        pop eax
+        push edx
+        push eax
+        push ebx
 
-        parse_loop:
-        mov al, [ecx]
-        call parse_digit        ;translate character to 4-bit value
+        push DWORD 200
+        call malloc
+        add esp, 4
+        push eax
+        push DWORD 100
+        call malloc
+        add esp, 4
+        push eax
+        push DWORD 100
+        call malloc
+        add esp, 4
+        push eax
+        ; teraz tak:
+        ;     output buffer     [esp + 20]
+        ;            source     [esp + 16]
+        ;   number of bytes     [esp + 12]
+        ;  200 bytes buffer     [esp + 8]
+        ;  operand 2 buffer     [esp + 4]
+        ;  operand 1 buffer     [esp]
+        ; zabezpieczenie outputu i operandow:
 
-        cmp al, 0xFF
-        je parse_err            ;if there was an error when parsing this character
+        mov eax, operand_1_num
+        mov ebx, [esp]
+        mov ecx, 0
+        preserve_op_1_loop:
+            mov edx, [eax, ecx * 4]
+            mov [ebx, ecx * 4], edx
+            inc ecx
+            cmp ecx, 25
+            jb preserve_op_1_loop
 
-        mov bl, al
-        push bx             ;we store our value on stack, so we can use al to call parse_digit again
-        
-        dec ecx
-        cmp ecx, [esp + 14]     ;if we just read last character but need one more
-        jb end_of_string
+        mov eax, operand_2_num
+        mov ebx, [esp + 4]
+        mov ecx, 0
+        preserve_op_2_loop:
+            mov edx, [eax, ecx * 4]
+            mov [ebx, ecx * 4], edx
+            inc ecx
+            cmp ecx, 25
+            jb preserve_op_2_loop
 
-        mov al, [ecx]
+        mov eax, output_num
+        mov ebx, [esp + 8]
+        mov ecx, 0
+        preserve_output_loop:
+            mov edx, [eax, ecx * 4]
+            mov [ebx, ecx * 4], edx
+            inc ecx
+            cmp ecx, 50
+            jb preserve_output_loop
 
-        call parse_digit        ;translate character to 4-bit value
+        push DWORD 100
+        push DWORD 0x0
+        push operand_2_num
+        call memset
+        add esp, 12
 
-        cmp al, 0xFF
-        je parse_err_sec        ;if there was an error when parsing this character
+        ; przygotowanie do uzyskiwania reszty raz za razem
+        mov DWORD [operand_2_num], 10
 
-        jmp rest_of_loop
-        end_of_string:          ;we just pad the string with leading 0, no need to translate
-        mov al, 0x0
+        mov eax, [esp + 16]
+        mov ebx, [esp + 12]
+        mov ecx, 0
+        prepare_number_loop:
+            mov dl, [eax + ecx]
+            mov [output_num + ecx], dl
+            inc ecx
+            cmp ecx, ebx
+            jb prepare_number_loop
 
-        rest_of_loop:
+        deb_lab_1:
 
-        mov ah, al              ;move older bits to ah
+        mov ecx, 0      ;licznik, ktora to cyfra
 
-        pop bx                  ;
-        ;mov ah, bl
-        mov al, bl              ;younger bits in al, older in ah
-        call merge_2_digits
+        number_to_string_loop:
+            push ecx
 
-        mov [edx], al
+            mov eax, output_num
+            mov ebx, operand_1_num
+            mov ecx, 0
+            output_to_op1_loop:
+                mov edx, [eax, ecx * 4]
+                mov [ebx, ecx * 4], edx
+                inc ecx
+                cmp ecx, 50
+                jb output_to_op1_loop
 
-        inc edx
-        dec ecx
-        cmp ecx, [esp + 12]     ;if we haven't exceeded first character in the string yet
-        jae parse_loop          ;we loop
+            call divide_enormous
 
-        mov eax, 0x0
-        jmp parse_end
+            mov ecx, output_num
+            sub ecx, 4
+            mov DWORD [ecx], 0
 
-        parse_err_sec:      ; if error occured after pushing bx, but before popping it
-        pop bx
-        parse_err:          ; if error occured before pushing bx
-        mov al, 0xFF
-        parse_end:
-        ret
+            pop ecx
+            mov dl, [operand_1_num]
+            add dl, 0x30
+            mov ebx, [esp + 20]
+            mov [ebx + ecx], dl
+            inc ecx
 
-    ;ascii character in al 
-    ;translates HEX digit to 4-bit value, returns in al
-    ;returns 0xFF if character provided was no digit
-    parse_digit:
-        sub al, 0x30        ;we assume it is a decimal digit
-        cmp al, 0x0A        ;if so
-        jb parse_byte_end   ;we jump to return
-        sub al, 0x07        ;otherwise we assume it's from range A - F
-        cmp al, 0x0A        ;if it was below A, we return error code
-        jb parse_byte_err
-        cmp al, 0x10        ;if in the range, we return translated value
-        jb parse_byte_end
-        sub al, 0x20        ;if not, we assume it was from range a - f
-        cmp al, 0x0A        ;if below a, we return error code
-        jb parse_byte_err   
-        cmp al, 0x10
-        jb parse_byte_end   ;if in the range, we return translated value
-        parse_byte_err:     ;otherwise we return error code
-        mov al, 0xFF
-        parse_byte_end:
-        ret
+            deb_lab_2:
 
-    ;parameters:
-    ;older 4 bits in ah
-    ;younger 4 bits in al
-    ;returns 8-bit value like ah|al in al
-    merge_2_digits:
-        shl ah, 0x04
-        add al, ah
+            mov DWORD [operand_2_num], 0
+            push ecx
+            mov eax, output_num
+            mov ebx, operand_2_num
+            mov cx, 200
+            call compare_enormous
+            pop ecx
+
+            cmp eax, 0
+            je number_to_string_loop_end
+
+            mov DWORD [operand_2_num], 10
+
+            jmp number_to_string_loop
+        number_to_string_loop_end:
+
+        mov eax, [esp + 20]
+        print_dec_loop:
+            push eax
+            push ecx
+            mov ebx, 0
+            mov bl, [eax + ecx]
+            push ebx
+            call putchar
+            add esp, 4
+            pop ecx
+            pop eax
+            cmp ecx, 0
+            je print_dec_loop_end
+            dec ecx
+            jmp print_dec_loop
+        print_dec_loop_end:
+
+        mov eax, output_num
+        mov ebx, [esp + 8]
+        mov ecx, 0
+        restore_output_loop:
+            mov edx, [ebx, ecx * 4]
+            mov [eax, ecx * 4], edx
+            inc ecx
+            cmp ecx, 50
+            jb restore_output_loop
+
+        mov eax, operand_2_num
+        mov ebx, [esp + 4]
+        mov ecx, 0
+        restore_op_2_loop:
+            mov edx, [ebx, ecx * 4]
+            mov [eax, ecx * 4], edx
+            inc ecx
+            cmp ecx, 25
+            jb restore_op_2_loop
+
+        mov eax, operand_1_num
+        mov ebx, [esp]
+        mov ecx, 0
+        restore_op_1_loop:
+            mov edx, [ebx, ecx * 4]
+            mov [eax, ecx * 4], edx
+            inc ecx
+            cmp ecx, 25
+            jb restore_op_1_loop
+
+        call free
+        add esp, 4
+        call free
+        add esp, 4
+        call free
+        add esp, 12
+        call free
+        add esp, 4
+
+        mov eax, 10
+        push eax
+        call putchar
+        add esp, 4
+
         ret
 
     ;parameters:
