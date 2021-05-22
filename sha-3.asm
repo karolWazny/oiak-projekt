@@ -480,6 +480,7 @@ SECTION .text
         mov ebx, [esp + 4]
 
         parse_dec_loop:
+            mov edx, 0
             mov dl, [ecx]
             cmp dl, 0x0
             je parse_dec_end
@@ -506,34 +507,6 @@ SECTION .text
             call mul_enormous_by_const
             add esp, 16
 
-
-
-
-
-        ; ###########################
-
-        push eax
-        push ebx
-        push ecx
-        push edx
-
-        mov eax, output_num
-        mov ebx, 200
-        call print_large
-
-        mov eax, operand_1_num
-        mov ebx, 100
-        call print_large
-
-        pop edx
-        pop ecx
-        pop ebx
-        pop eax
-
-        ; ###########################
-
-
-
             mov eax, 0
             mov ebx, [esp + 20]
 
@@ -549,7 +522,17 @@ SECTION .text
             pop ebx
             pop eax
 
-            add [ebx], dl
+            push ecx
+            mov ecx, 0
+
+            add [ebx], edx
+
+            parse_propagate_carry:
+                inc ecx
+                adc DWORD [ebx, ecx * 4], 0
+                jc parse_propagate_carry
+
+            pop ecx
 
         inc ecx
         jmp parse_dec_loop
