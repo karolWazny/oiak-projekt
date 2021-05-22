@@ -326,6 +326,20 @@ SECTION .text
         call printf
         add esp, 4
 
+        mov eax, [operand_1_sign]
+        mov ebx, [operand_2_sign]
+
+        xor eax, ebx
+
+        cmp eax, 0
+        je mlt_negative_end
+
+        mov eax, '-'
+        push eax
+        call putchar
+        add esp, 4
+        mlt_negative_end:
+
         mov eax, output_num
         mov ebx, 200
         call print_large_dec
@@ -382,7 +396,6 @@ SECTION .text
         mov bl, [eax]
 
         mov ecx, [esp + 12]
-        mov ebx, [esp + 4]
 
         cmp bl, '-'
         jne not_minus
@@ -399,6 +412,7 @@ SECTION .text
         sign_end:
 
         mov eax, 0
+        mov ebx, [esp + 4]
 
         parse_dec_loop:
             mov dl, [ecx]
@@ -644,57 +658,6 @@ SECTION .text
 
         mov eax, 10
         push eax
-        call putchar
-        add esp, 4
-
-        ret
-
-    ;parameters:
-    ; first (youngest) byte address in eax
-    ; number of bytes in ebx (like sizeof(enormous_int_type))
-    ; we assume little-endiannes here!!!
-    print_large:
-        add ebx, eax
-        leading_zeros:  ; no need to print all the leading zeros
-            dec ebx     ; last byte of the enormous_int_type address
-            mov dl, [ebx]
-            cmp ebx, eax
-            jbe first_printable
-
-            cmp dl, 0x0
-            je leading_zeros
-
-        
-        first_printable:
-        push eax
-        push ebx
-        push edx
-        push formatout_hhx
-        call printf
-        add esp, 8
-        pop ebx
-        pop eax
-
-        p_large_loop:
-            dec ebx
-            cmp ebx, eax
-            jb p_large_end
-
-            push eax
-            push ebx
-            mov dl, [ebx]
-            push edx
-            push formatout_hhx_pad
-            call printf
-            add esp, 8
-            pop ebx
-            pop eax
-
-            jmp p_large_loop
-
-        p_large_end:
-
-        push DWORD 10
         call putchar
         add esp, 4
 
