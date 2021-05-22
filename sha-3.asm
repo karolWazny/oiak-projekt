@@ -365,6 +365,20 @@ SECTION .text
         call printf
         add esp, 4
 
+        mov eax, [operand_1_sign]
+        mov ebx, [operand_2_sign]
+
+        xor eax, ebx
+
+        cmp eax, 0
+        je div_negative_q_end
+
+        mov eax, '-'
+        push eax
+        call putchar
+        add esp, 4
+        div_negative_q_end:
+
         mov eax, output_num
         mov ebx, 200
         call print_large_dec
@@ -372,6 +386,20 @@ SECTION .text
         push message_res
         call printf
         add esp, 4
+
+        mov eax, [operand_1_sign]
+        mov ebx, [operand_2_sign]
+
+        xor eax, ebx
+
+        cmp eax, 0
+        je div_negative_r_end
+
+        mov eax, '-'
+        push eax
+        call putchar
+        add esp, 4
+        div_negative_r_end:
 
         mov eax, operand_1_num
         mov ebx, 100
