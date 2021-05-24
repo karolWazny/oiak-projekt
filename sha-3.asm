@@ -332,8 +332,10 @@ SECTION .text
         add esp, 4
 
     mov eax, [esp + 4]
-    mov ebx, [operand_1_num]
+    mov ebx, [operand_1_sign]
     xor eax, ebx
+
+    deb_lab:
 
     cmp eax, 0
     je print_module
@@ -628,8 +630,6 @@ SECTION .text
             cmp ecx, ebx
             jb prepare_number_loop
 
-        deb_lab_1:
-
         mov ecx, 0      ;licznik, ktora to cyfra
 
         number_to_string_loop:
@@ -657,8 +657,6 @@ SECTION .text
             mov ebx, [esp + 20]
             mov [ebx + ecx], dl
             inc ecx
-
-            deb_lab_2:
 
             mov DWORD [operand_2_num], 0
             push ecx
