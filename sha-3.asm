@@ -939,23 +939,24 @@ SECTION .text
             jc add_if_carry
 
             add_not_carry:
+                push DWORD 0
                 cmp ecx, 25
-                jae add_loop_end            ; while counter < 100
+                jae add_loop_end           ; while counter < 100
+                add esp, 4
                 clc
                 jmp add_loop
 
             add_if_carry:
+                push DWORD 1
                 cmp ecx, 25
                 jae add_loop_end            ; while counter < 100
+                add esp, 4
                 stc
                 jmp add_loop
 
         add_loop_end:
 
-        mov eax, [operand_1_num + 96]
-        add eax, [operand_2_num + 96]
-        mov eax, 0
-        adc eax, 0
+        pop eax
         mov [output_num + 100], eax
 
         ret
