@@ -873,44 +873,35 @@ SECTION .text
         ;multiplication algorithm
         mul_ext_loop:
 
-        mov ecx, 0
+            mov ecx, 0
 
-        mul_inner_loop:
-            mov eax, [operand_1_num + ebx]
-            mov edx, [operand_2_num + ecx]
-            mul edx
+            mul_inner_loop:
+                mov eax, [operand_1_num, ebx * 4]
+                mov edx, [operand_2_num, ecx * 4]
+                mul edx
 
-            push ecx                ; temporarily we need ecx for destination address
-            add ecx, output_num     ; of current byte
-            add ecx, ebx
-            clc
+                push ecx                ; temporarily we need ecx for destination address
+                add ecx, ebx            ; of current byte
+                
+                clc
 
-            add [ecx], eax          ; we add younger bits of multiplying
-            add ecx, 4              ; properly shifted to output
+                add [output_num, 4 * ecx], eax          ; we add younger bits of multiplying
+                inc ecx              ; properly shifted to output
 
-            while_carry:
-            adc [ecx], edx          ; the same about older bits, but with carry
-          jc if_carry
-            add ecx, 4
-            mov edx, 0
-          jmp while_carry_end
+                while_carry:
+                    adc [output_num, 4 * ecx], edx          ; the same about older bits, but with carry
+                    inc ecx
+                    mov edx, 0
+                    jc while_carry
 
-          if_carry:
-          add ecx, 4
-          mov edx, 0
-          stc
+                pop ecx                 ; we want our counter back
+                inc ecx
+                cmp ecx, 25
+                jb mul_inner_loop       ; while counter is lower than 100
 
-          while_carry_end:
-            jc while_carry          ; we keep propagating carry while there is any
-
-            pop ecx                 ; we want our counter back
-            add ecx, 4
-            cmp ecx, 100
-            jb mul_inner_loop       ; while counter is lower than 100
-
-        add ebx, 4
-        cmp ebx, 100
-        jb mul_ext_loop             ; while counter < 100
+            inc ebx
+            cmp ebx, 25
+            jb mul_ext_loop             ; while counter < 100
 
         ret
 
